@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indian Grocery Planner (Local)</title>
+<!-- Load Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Load Lucide Icons -->
+<script src="https://cdn.jsdelivr.net/npm/@lucide/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+/* Using a clean, professional font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+body {
+font-family: 'Inter', sans-serif;
+/* Light, neutral background */
+background-color: #f0f2f5;
+}
+/* Custom scrollbar for a polished look */
+.scroll-container {
+max-height: 65vh;
+overflow-y: auto;
+scrollbar-width: thin;
+scrollbar-color: #4338CA #e5e7eb; /* Indigo thumb */
+}
+.scroll-container::-webkit-scrollbar {
+width: 8px;
+}
+.scroll-container::-webkit-scrollbar-thumb {
+background-color: #4338CA; /* Indigo-700 */
+border-radius: 4px;
+}
+.scroll-container::-webkit-scrollbar-track {
+background-color: #e5e7eb;
+}
+/* Custom styles for the required checkbox look */
+input[type="checkbox"] {
+border-width: 2px;
+}
+/* Ensure inputs are responsive */
+.quantity-input {
+width: 60px; /* Smaller default width for mobile */
+padding: 8px; /* Touch target size */
+}
+@media (min-width: 640px) {
+.quantity-input {
+width: 80px; /* Wider for desktop/tablet */
+padding: 10px;
+}
+}
+</style>
+</head>
+<body class="p-2 sm:p-4 md:p-8">
+
+<div id="app" class="max-w-4xl mx-auto bg-white shadow-2xl rounded-2xl p-4 md:p-10 border-t-8 border-indigo-700">
+
+<!-- Header & Status -->
+<header class="mb-6 flex justify-between items-start flex-wrap border-b pb-4 border-gray-100">
+<div>
+<h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold text-indigo-800">
+<i data-lucide="building-2" class="w-6 h-6 sm:w-8 sm:h-8 inline-block mr-2 text-amber-500"></i>
+Monthly Grocery List
+</h1>
+<p class="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
+Saving locally in your browser. <strong class="text-red-500">Not shared across devices.</strong>
+</p>
+</div>
+<div class="mt-3 sm:mt-0 flex items-center space-x-2">
+<!-- RESET BUTTON (Cautionary Red) -->
+<button onclick="resetQuantities()"
+class="bg-red-500 text-white p-2 rounded-lg font-semibold hover:bg-red-600 transition duration-150 shadow-md flex items-center text-xs sm:text-sm transform hover:scale-[1.03]">
+<i data-lucide="rotate-ccw" class="w-4 h-4 sm:mr-1"></i> <span class="hidden sm:inline">Reset Quantities</span>
+</button>
+</div>
+</header>
+
+<!-- Add Item Input Block (Warm Saffron Accent) -->
+<div class="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-3 mb-6 p-4 sm:p-5 bg-amber-50 rounded-xl shadow-lg border-l-4 border-amber-500">
+<input type="text" id="newItemInput" placeholder="Add a new custom item (e.g., 'Ghee')"
+class="w-full sm:flex-grow p-3 text-base sm:text-lg border-2 border-amber-200 rounded-lg focus:ring-amber-500 focus:border-amber-500 transition duration-200 shadow-sm outline-none"
+onkeydown="if(event.key === 'Enter') handleAddItem()">
+<button onclick="handleAddItem()"
+class="w-full sm:w-auto bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition duration-200 shadow-xl flex items-center justify-center transform hover:scale-[1.05] active:scale-[0.98]">
+<i data-lucide="plus" class="w-5 h-5 sm:mr-1"></i> <span class="hidden sm:inline">Add Item</span>
+<span class="inline sm:hidden">Add</span>
+</button>
+</div>
+
+<!-- Main List Area -->
+<!-- Loading message is removed as we load instantly from local storage -->
+<div id="groceryListContainer" class="scroll-container bg-white rounded-xl mb-6 border border-gray-200 shadow-inner">
+<!-- Grocery list items will be injected here -->
+</div>
+
+<!-- Generate Final List Button (Saffron Primary Action) -->
+<button onclick="generateFinalList()" id="generateButton"
+class="w-full bg-amber-500 text-white text-lg sm:text-xl p-3 sm:p-4 rounded-xl font-bold hover:bg-amber-600 transition duration-200 shadow-2xl shadow-amber-300/80 transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center">
+<i data-lucide="shopping-bag" class="w-6 h-6 mr-2 sm:mr-3 inline-block"></i> Generate Shopping List
+</button>
+
+<!-- Final List Output Modal (Custom Alert) -->
+<div id="finalListModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden p-4 flex items-center justify-center">
+<div class="bg-white rounded-xl shadow-3xl w-full max-w-lg p-6 md:p-8 transform transition-all scale-100 border-t-4 border-amber-500">
+<h2 class="text-2xl sm:text-3xl font-bold mb-4 text-indigo-700 flex items-center">
+<i data-lucide="list-checks" class="w-7 h-7 mr-2 text-amber-500"></i> Your Shopping List
+</h2>
+<div id="finalListContent" class="space-y-3 p-4 bg-gray-50 rounded-lg text-base sm:text-lg min-h-[100px] max-h-96 overflow-y-auto border border-gray-200">
+<!-- Final list items will be injected here -->
+</div>
+<div class="mt-6 flex justify-end space-x-3">
+<button onclick="copyToClipboard()"
+class="bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700 transition duration-150 flex items-center shadow-md text-sm sm:text-base">
+<i data-lucide="clipboard-copy" class="w-5 h-5 mr-1"></i> Copy List
+</button>
+<button onclick="closeModal('finalListModal')"
+class="bg-gray-300 text-gray-800 p-3 rounded-lg font-semibold hover:bg-gray-400 transition duration-150 shadow-md text-sm sm:text-base">
+Close
+</button>
+</div>
+</div>
+</div>
+
+<!-- Notification/Error Modal -->
+<div id="notificationModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 hidden p-4 flex items-center justify-center">
+<div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 transform transition-all scale-100 border-t-4 border-indigo-500">
+<h3 class="text-xl font-bold mb-3 text-red-600" id="notificationTitle">Error</h3>
+<p id="notificationMessage" class="text-gray-700 text-sm"></p>
+<div class="mt-4 flex justify-end">
+<button onclick="closeModal('notificationModal')"
+class="bg-gray-300 text-gray-800 p-2 rounded-lg font-semibold hover:bg-gray-400 text-sm">
+Dismiss
+</button>
+</div>
+</div>
+</div>
+
+</div>
+
+<!-- Application Logic (using localStorage) -->
+<script>
+// Global state for groceries
+window.groceries = [];
+const LOCAL_STORAGE_KEY = 'indianGroceryList';
+
+// Default list of Indian household staples (non-produce)
+const DEFAULT_GROCERIES = [
+{ id: 'rice', name: 'Rice (Chawal)', quantity: 0, isCustom: false },
+{ id: 'atta', name: 'Wheat Flour (Atta)', quantity: 0, isCustom: false },
+{ id: 'sugar', name: 'Sugar (Cheeni)', quantity: 0, isCustom: false },
+{ id: 'salt', name: 'Salt (Namak)', quantity: 0, isCustom: false },
+{ id: 'tea', name: 'Tea Powder (Chai Patti)', quantity: 0, isCustom: false },
+{ id: 'coffee', name: 'Coffee Powder', quantity: 0, isCustom: false },
+{ id: 'oil', name: 'Cooking Oil (Tel)', quantity: 0, isCustom: false },
+{ id: 'toordal', name: 'Toor Dal', quantity: 0, isCustom: false },
+{ id: 'moongdal', name: 'Moong Dal', quantity: 0, isCustom: false },
+{ id: 'rajma', name: 'Kidney Beans (Rajma)', quantity: 0, isCustom: false },
+{ id: 'haldi', name: 'Turmeric Powder (Haldi)', quantity: 0, isCustom: false },
+{ id: 'mirchi', name: 'Chilli Powder', quantity: 0, isCustom: false },
+{ id: 'jeera', name: 'Cumin Seeds (Jeera)', quantity: 0, isCustom: false },
+];
+
+// --- Utility Functions ---
+
+/**
+* Helper to safely generate a unique ID.
+* @returns {string} A unique ID.
+*/
+const generateUniqueId = () => {
+return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+}
+
+/**
+* Shows a custom notification modal.
+* @param {string} title - The title of the notification.
+* @param {string} message - The message content.
+*/
+window.showNotification = (title, message) => {
+document.getElementById('notificationTitle').textContent = title;
+document.getElementById('notificationMessage').textContent = message;
+
+// Adjust header color based on title content for better feedback
+const titleElement = document.getElementById('notificationTitle');
+if (title.includes('Error') || title.includes('Failed')) {
+titleElement.classList.remove('text-indigo-600');
+titleElement.classList.add('text-red-600');
+} else {
+titleElement.classList.remove('text-red-600');
+titleElement.classList.add('text-indigo-600');
+}
+
+document.getElementById('notificationModal').classList.remove('hidden');
+};
+
+/**
+* Closes a modal by its ID.
+* @param {string} modalId - The ID of the modal to close.
+*/
+window.closeModal = (modalId) => {
+document.getElementById(modalId).classList.add('hidden');
+};
+
+// --- Persistence (localStorage) ---
+
+/**
+* Loads the grocery list from localStorage, or uses defaults if none exists.
+*/
+const loadListFromLocalStorage = () => {
+try {
+const storedList = localStorage.getItem(LOCAL_STORAGE_KEY);
+if (storedList) {
+window.groceries = JSON.parse(storedList);
+// Ensure all items are present and have required keys
+if (!Array.isArray(window.groceries) || window.groceries.length === 0) {
+window.groceries = DEFAULT_GROCERIES;
+}
+} else {
+window.groceries = DEFAULT_GROCERIES;
+}
+saveListToLocalStorage(window.groceries); // Ensure defaults are saved if first run
+} catch (error) {
+console.error("Error loading from localStorage:", error);
+window.groceries = DEFAULT_GROCERIES;
+showNotification("Local Storage Error", "Failed to load saved data. Starting with default list.");
+}
+};
+
+/**
+* Saves the current groceries array to localStorage.
+* @param {Array} list - The list to save.
+*/
+const saveListToLocalStorage = (list) => {
+try {
+localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+renderList(); // Re-render the list immediately after saving
+} catch (error) {
+console.error("Failed to save list to localStorage:", error);
+showNotification("Save Error", "Could not save changes locally. Your browser might be in private mode.");
+}
+};
+
+// --- Data Mutators ---
+
+/**
+* Updates the quantity of a specific item in the local list and saves.
+* @param {string} itemId - ID of the item.
+* @param {number} newQuantity - The new quantity value.
+*/
+window.updateQuantity = (itemId, newQuantity) => {
+const updatedItems = window.groceries.map(item => {
+if (item.id === itemId) {
+return { ...item, quantity: newQuantity };
+}
+return item;
+});
+window.groceries = updatedItems;
+saveListToLocalStorage(window.groceries);
+};
+
+/**
+* Resets all item quantities in the list to zero and updates localStorage.
+*/
+window.resetQuantities = () => {
+const resetItems = window.groceries.map(item => ({
+...item,
+quantity: 0
+}));
+window.groceries = resetItems;
+saveListToLocalStorage(window.groceries);
+showNotification("Success", "All grocery quantities have been reset to zero.");
+};
+
+/**
+* Handles adding a new item via the input field.
+*/
+window.handleAddItem = () => {
+const input = document.getElementById('newItemInput');
+const itemName = input.value.trim();
+
+if (itemName === "") {
+showNotification("Input Required", "Please enter a name for the item you wish to add.");
+return;
+}
+
+// Check for duplicate name (case insensitive)
+const isDuplicate = window.groceries.some(item => item.name.toLowerCase() === itemName.toLowerCase());
+if (isDuplicate) {
+showNotification("Duplicate Item", `'${itemName}' already exists in your list.`);
+return;
+}
+
+// Create a new item object
+const newItem = {
+id: generateUniqueId(),
+name: itemName,
+quantity: 0,
+isCustom: true
+};
+
+window.groceries = [...window.groceries, newItem];
+saveListToLocalStorage(window.groceries);
+
+input.value = ''; // Clear input
+showNotification("Success", `'${itemName}' has been added to your list.`);
+};
+
+/**
+* Handles removing an item (custom or default).
+* @param {string} itemId - The ID of the item to remove.
+* @param {string} itemName - The name of the item for notification.
+*/
+window.handleRemoveItem = (itemId, itemName) => {
+const updatedItems = window.groceries.filter(item => item.id !== itemId);
+window.groceries = updatedItems;
+saveListToLocalStorage(window.groceries);
+showNotification("Removed", `'${itemName}' was successfully removed from the list.`);
+};
+
+
+// --- UI Rendering ---
+
+/**
+* Renders the entire editable grocery list based on the global 'groceries' array.
+*/
+const renderList = () => {
+const container = document.getElementById('groceryListContainer');
+if (!container) return;
+
+container.innerHTML = ''; // Clear previous list
+
+if (window.groceries.length === 0) {
+container.innerHTML = '<p class="text-center text-gray-500 p-8 text-lg italic">Your list is currently empty. Add an item above!</p>';
+return;
+}
+
+window.groceries.forEach(item => {
+// Ensure quantity is treated as a number
+const qty = Number(item.quantity) || 0;
+// Check if the item is required (quantity is 1 or more).
+const isRequired = qty >= 1;
+
+const itemDiv = document.createElement('div');
+// Use flex-wrap on sm screens to handle narrow content better
+itemDiv.className = 'flex flex-wrap items-center justify-between p-3 sm:p-4 border-b border-gray-100 last:border-b-0 transition duration-150 bg-white hover:bg-indigo-50/50';
+itemDiv.innerHTML = `
+<div class="flex items-center flex-grow min-w-0 mb-2 sm:mb-0 w-full sm:w-auto">
+<!-- Checkbox acts as a quick toggle for item necessity -->
+<input type="checkbox" id="check-${item.id}"
+class="w-6 h-6 text-amber-500 bg-gray-100 border-gray-300 rounded-md focus:ring-amber-500 transition duration-150 shadow-sm"
+${isRequired ? 'checked' : ''}
+onchange="handleCheckboxChange('${item.id}', this.checked)">
+
+<!-- Item Name: Larger text, truncated on overflow -->
+<label for="check-${item.id}" class="ml-3 text-lg sm:text-xl font-medium text-gray-800 truncate ${isRequired ? 'font-semibold' : 'text-gray-600'} max-w-[calc(100%-40px)]">
+${item.name}
+</label>
+</div>
+
+<!-- Interaction Block: Moves to the right, stays aligned on mobile -->
+<div class="flex items-center space-x-2 sm:space-x-3 ml-auto w-full sm:w-auto justify-end">
+<!-- Quantity Input -->
+<input type="number" id="qty-${item.id}" value="${qty}" min="0"
+class="quantity-input p-2 text-base text-center border-2 border-gray-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 shadow-inner outline-none"
+onchange="handleQuantityChange('${item.id}', this.value)"
+onclick="this.select()">
+
+<!-- REMOVE BUTTON (Responsive Text) -->
+<button onclick="handleRemoveItem('${item.id}', '${item.name}')"
+class="text-xs sm:text-sm bg-gray-200 text-red-600 font-semibold py-2 px-3 rounded-lg hover:bg-red-500 hover:text-white transition duration-150 shadow-md flex items-center whitespace-nowrap"
+title="Remove this item permanently">
+<i data-lucide="trash-2" class="w-4 h-4 sm:mr-1"></i>
+<span class="inline sm:hidden">Remove</span>
+<span class="hidden sm:inline">Remove Permanently</span>
+</button>
+</div>
+`;
+container.appendChild(itemDiv);
+});
+
+// Re-render Lucide icons
+if (typeof lucide !== 'undefined') {
+lucide.createIcons();
+}
+};
+
+// --- User Interaction Handlers (Logic remains the same, but now calls local update) ---
+
+/**
+* Handles quantity input change and updates local list.
+*/
+window.handleQuantityChange = (itemId, value) => {
+const newQuantity = Math.max(0, parseInt(value, 10) || 0);
+document.getElementById(`qty-${itemId}`).value = newQuantity; // Ensure UI reflects valid number
+
+// Sync checkbox state
+const checkbox = document.getElementById(`check-${itemId}`);
+if (checkbox) {
+// Use newQuantity >= 1 to correctly check the box for quantity 1 or more
+checkbox.checked = newQuantity >= 1;
+}
+
+updateQuantity(itemId, newQuantity);
+};
+
+/**
+* Handles checkbox change to quickly set/unset quantity.
+*/
+window.handleCheckboxChange = (itemId, isChecked) => {
+// Checkbox check sets quantity to 1, uncheck sets to 0
+const newQuantity = isChecked ? 1 : 0;
+document.getElementById(`qty-${itemId}`).value = newQuantity;
+
+updateQuantity(itemId, newQuantity);
+};
+
+/**
+* Generates and displays the final shopping list.
+*/
+window.generateFinalList = () => {
+const requiredItems = window.groceries
+.filter(item => Number(item.quantity) >= 1) // Check for >= 1
+.sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
+
+const contentDiv = document.getElementById('finalListContent');
+contentDiv.innerHTML = '';
+
+let clipboardText = "Your Monthly Shopping List:\n\n";
+
+if (requiredItems.length === 0) {
+contentDiv.innerHTML = '<p class="text-center text-gray-500 italic p-4">You currently have no items selected. Check the quantities of the items you need!</p>';
+clipboardText = "Shopping List is empty. All item quantities were set to zero.";
+} else {
+let listHTML = '<ol class="list-decimal list-inside space-y-2">';
+requiredItems.forEach((item, index) => {
+const text = `${item.name} (Qty: ${item.quantity})`;
+listHTML += `<li class="border-b border-gray-100 pb-1 last:border-b-0 text-indigo-800"><strong class="font-semibold">${item.name}</strong>: ${item.quantity} units</li>`;
+clipboardText += `${index + 1}. ${item.name} (Qty: ${item.quantity})\n`;
+});
+listHTML += '</ol>';
+contentDiv.innerHTML = listHTML;
+}
+
+// Store the text for the copy function
+contentDiv.dataset.clipboardText = clipboardText;
+
+// Show the modal
+document.getElementById('finalListModal').classList.remove('hidden');
+if (typeof lucide !== 'undefined') { // Safety check
+lucide.createIcons(); // Ensure icons in modal are rendered
+}
+};
+
+/**
+* Copies the generated shopping list to the clipboard.
+*/
+window.copyToClipboard = () => {
+const contentDiv = document.getElementById('finalListContent');
+const textToCopy = contentDiv.dataset.clipboardText;
+
+if (textToCopy) {
+// Fallback for clipboard access in iframes
+const tempTextArea = document.createElement('textarea');
+tempTextArea.value = textToCopy;
+document.body.appendChild(tempTextArea);
+tempTextArea.select();
+try {
+document.execCommand('copy');
+showNotification("Copied!", "Shopping list copied to your clipboard.");
+} catch (err) {
+console.error('Could not copy text: ', err);
+showNotification("Copy Failed", "Automatic copy failed. Please copy the text manually.");
+}
+document.body.removeChild(tempTextArea);
+}
+closeModal('finalListModal');
+};
+
+// Initialize the application: Load data and render list
+window.onload = () => {
+loadListFromLocalStorage();
+renderList();
+};
+</script>
+
+</body>
+</html>
